@@ -1,0 +1,97 @@
+"""
+-------------------------------------------------
+   作者：W.Lionel.Esaka
+   日期：2021-06-10
+   开发工具：PyCharm
+   基于TensorFlow2的岩石图片分类识别
+-------------------------------------------------
+"""
+import os
+import numpy as np
+from PIL import Image
+from tensorflow.keras import layers,models
+from sklearn.model_selection import train_test_split
+
+# 自定义模型训练次数
+TrainingTimes = 10
+# 训练集文件路径
+ImgPath = "C:\\Users\\忒修斯\\Desktop\\c0fb8-main\\图片"
+# 文件夹所有图片文件名
+ImgList = os.listdir(ImgPath)
+# 定义输入数据
+X = np.zeros((len(ImgList), 100, 100, 3))
+# 定义输出数据
+Y = np.zeros(len(ImgList))
+for i in range(len(ImgList)):
+    # 读取第一张图片，img有R、G、B(三色)三个通道
+    img = Image.open(ImgPath + "\\" + ImgList[i])
+    # 分离R、G、B通道
+    sep = img.split()
+    # R 通道
+    R = np.array(sep[0])
+    # 注意中心点
+    row_1 = int(R.shape[0] / 2) - 50
+    row_2 = int(R.shape[0] / 2) + 50
+    con_1 = int(R.shape[1] / 2) - 50
+    con_2 = int(R.shape[1] / 2) + 50
+    R = R[row_1:row_2, con_1:con_2]
+    # G 通道
+    G = np.array(sep[1])
+    G = G[row_1:row_2, con_1:con_2]
+    # B 通道
+    B = np.array(sep[2])
+    B = B[row_1:row_2, con_1:con_2]
+    # 获取R、G、B通道即可，并归一化
+    X[i, :, :, 0] = R / 255
+    X[i, :, :, 1] = G / 255
+    X[i, :, :, 2] = B / 255
+    # 构造输出数据，岩石类别编号
+    S = ImgList[i]
+    I = S.find('_', 0, len(S))
+    if int(S[:I]) == 1:
+        Y[i] = 0
+    elif int(S[:I]) == 2:
+        Y[i] = 1
+    elif int(S[:I]) == 3:
+        Y[i] = 2
+    elif int(S[:I]) == 4:
+        Y[i] = 3
+    else:
+        Y[i] = 4
+# 对输入数据X和输出数据Y，按训练及80%，测试20%随机划分
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=4)
+model = models.Sequential()
+# 第一个卷积层，卷积神经元个数为32，卷积核大小为3×3，默认可省略
+model.add(layers.Conv2D(32, (3, 3), strides=(1, 1), activation='relu', input_shape=(100, 100, 3)))
+# 第一个池化层，2×2池化，步长为2，默认可缺省
+model.add(layers.MaxPooling2D((2, 2), strides=2))
+# 第二个卷积层和池化层
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+# 第三个卷积层和池化层
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+# 第四个卷积层
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+# 展平
+model.add(layers.Flatten())
+# 全连接层
+model.add(layers.Dense(64, activation='relu'))
+# 输出层
+model.add(layers.Dense(5, activation='softmax'))
+# 模型优化器、损失函数和评估方法，采用adam优化器、分类交叉熵函数和预测准确率
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+# 我们设定对训练集的迭代训练次数
+model.fit(x_train, y_train, epochs=TrainingTimes)
+model.evaluate(x_test, y_test, verbose=2)
+# 获得预测结果概率矩阵
+yy = model.predict(x_test)
+# 获得最终预测结果，取概率最大的类标签
+y1 = np.argmax(yy, axis=1)
+# 预测结果与实际结果相减
+r = y1 - y_test
+# 计算预测准确率
+rv = len(r[r == 0]) / len(r)
+print("预测准确率:", rv)
+
+# `train_dir`和`validation_dir`应分别指向训练集和验证集的目录。`num_epochs`是训练的轮数，`batch_size`决定了每次更新权重时使用的样本数量。
